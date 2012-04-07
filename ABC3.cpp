@@ -66,11 +66,39 @@ struct ABC3 : public ModulePass
 					
 					if(StoreInst *si = dyn_cast<StoreInst>(inst))
 					{
-					  errs()<<*si<<"\n";
+					  int index = si->getNumOperands()-2;
+					  if(ConstantInt *CI = dyn_cast<ConstantInt>(si->getOperand(index))){
+					      errs()<<*CI<<"\n";
+					      //have to distinguish between the three different types of assignations
+					  }
 					}
 					else if(BranchInst *bi = dyn_cast<BranchInst>(inst))
 					{
-					  errs()<<*bi<<"\n";
+					  if(bi->getNumOperands()>1)
+					  {
+					    if(CmpInst *ci = dyn_cast<CmpInst>(bi->getCondition()))
+					    {
+					      CmpInst::Predicate pred = ci->getPredicate();
+					      if(pred==CmpInst::ICMP_SLT || pred==CmpInst::ICMP_SLE)  //upper bound
+					      {
+					        Value *op1 = ci->getOperand(0);
+					        Value *op2 = ci->getOperand(1);
+					        if(isa<LoadInst>(op1) || isa<LoadInst>(op2))
+					        {
+					          //add the pi assignments and generate the constriction
+					        }
+					      }
+					      if(pred==CmpInst::ICMP_SGT || pred==CmpInst::ICMP_SGE)  //lower bound
+					      {
+					        Value *op1 = ci->getOperand(0);
+					        Value *op2 = ci->getOperand(1);
+					        if(isa<LoadInst>(op1) || isa<LoadInst>(op2))
+					        {
+					          //add the pi assignments and generate the constriction
+					        }
+					      }
+					    }
+					  }
 					}
 					else if(GetElementPtrInst *gep = dyn_cast<GetElementPtrInst>(inst))
 					{
