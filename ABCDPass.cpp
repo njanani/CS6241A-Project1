@@ -106,7 +106,7 @@ namespace {
 			}
 
 			Graph::INEQGraph  * construct_lbgraph(Function &F){
-				char *lowerInstr = "checkLower";
+				char *lowerChkBlock = "checkLower";
 				char *piFoo  = "piInt";
 				Graph::INEQGraph  *inequalityGraph = new Graph::INEQGraph ();
 				for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I){
@@ -120,7 +120,7 @@ namespace {
 					} else if (isa<ICmpInst>(*I)){
 						ICmpInst *icmpInstr = cast<ICmpInst>(&*I);	
 						BasicBlock *instrBlock= icmpInstr->getParent();
-						if ((instrBlock)->getName().startswith(StringRef(lowerInstr))){
+						if ((instrBlock)->getName().startswith(StringRef(lowerChkBlock))){
 							LB_arrayCheckInstList.push_back(&*I);
 						}
 					}
@@ -291,7 +291,7 @@ namespace {
 			}
 			Graph::INEQGraph  * construct_ubgraph(Function &F){
 				
-				char *upperInstr = "checkUpper";
+				char *upperChkBlock = "checkUpper";
 				char *piFoo  = "piInt";
 				Graph::INEQGraph  *inequalityGraph = new Graph::INEQGraph ();
 				for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I){
@@ -305,7 +305,7 @@ namespace {
 					else if (isa<ICmpInst>(*I)){
                                                 ICmpInst *icmpInstr = cast<ICmpInst>(&*I);    
                                                 BasicBlock *instrBlock= icmpInstr->getParent();
-                                                if ((instrBlock)->getName().startswith(StringRef(upperInstr))){
+                                                if ((instrBlock)->getName().startswith(StringRef(upperChkBlock))){
                                                         UB_arrayCheckInstList.push_back(&*I);
                                                 }   
                                         }   

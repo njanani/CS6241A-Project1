@@ -69,7 +69,7 @@ struct ESSA : public ModulePass
 		}
 		for(std::vector<BranchInst*>::iterator i = vCondBranch.begin(), e = vCondBranch.end(); i != e; ++i)
 		{
-			DEBUG_PRINT("Examining a conditional branch!);
+			DEBUG_PRINT("Examining a conditional branch!");
 			Value *ops[2];
 			CmpInst *cmp = dyn_cast<CmpInst>((*i)->getCondition());
 
