@@ -1,1 +1,6 @@
 GIT respository for CS6241A - Project1
+Current directory - llvm-3.0/lib/Transforms/CS6241A-Project1
+Path to C file - examples/test.c
+
+(1) Baseline
+opt -stats -load ../../../Debu
