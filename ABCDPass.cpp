@@ -287,6 +287,33 @@ namespace {
 					}
 				}
 			}
+
+
+			//Print out graph
+						int count = 0;
+						for (std::map<Value *, Graph::INEQNode* >::iterator PI = inequalityGraph->variableList.begin(),
+						PE = inequalityGraph->variableList.end(); PI != PE; ++PI){
+
+						errs() << "\nNode" << count; PI->first->dump(); //errs() << "\n";
+						for (std::map<Graph::INEQNode*, int >::iterator PII = PI->second->out.begin(),
+						PEE = PI->second->out.end(); PII != PEE; ++PII){
+						errs() << "Node" << count << "outlist::To"; PII->first->value->dump(); errs() << " Weight::" << PII->second << "\n";
+						}
+						count++;
+						}
+
+						for (std::map<Value *, Graph::INEQNode* >::iterator PI = inequalityGraph->arrayLengthList.begin(),
+						PE = inequalityGraph->arrayLengthList.end(); PI != PE; ++PI){
+
+						errs() << "\nNode" << count; PI->first->dump(); //errs() << "\n";
+						for (std::map<Graph::INEQNode*, int >::iterator PII = PI->second->out.begin(),
+						PEE = PI->second->out.end(); PII != PEE; ++PII){
+						errs() << "Node" << count << "outlist::To";  PII->first->value->dump(); errs() << " Weight::" << PII->second << "\n";
+						}
+						count++;
+						}
+
+			 
 			return inequalityGraph;
 			}
 			Graph::INEQGraph  * construct_ubgraph(Function &F){
@@ -475,6 +502,32 @@ namespace {
 					}
 				}
 			}
+
+				  //Print out graph
+                  int count = 0;
+                  for (std::map<Value *, Graph::INEQNode* >::iterator PI = inequalityGraph->variableList.begin(),
+                  PE = inequalityGraph->variableList.end(); PI != PE; ++PI){
+
+                  errs() << "\nNode" << count; PI->first->dump(); //errs() << "\n";
+                  for (std::map<Graph::INEQNode*, int >::iterator PII = PI->second->out.begin(),
+                  PEE = PI->second->out.end(); PII != PEE; ++PII){
+                  errs() << "Node" << count << "outlist::To"; PII->first->value->dump(); errs() << " Weight::" << PII->second << "\n";
+                  }
+                  count++;
+                  }
+
+                  for (std::map<Value *, Graph::INEQNode* >::iterator PI = inequalityGraph->arrayLengthList.begin(),
+                  PE = inequalityGraph->arrayLengthList.end(); PI != PE; ++PI){
+
+                  errs() << "\nNode" << count; PI->first->dump(); //errs() << "\n";
+                  for (std::map<Graph::INEQNode*, int >::iterator PII = PI->second->out.begin(),
+                  PEE = PI->second->out.end(); PII != PEE; ++PII){
+                  errs() << "Node" << count << "outlist::To";  PII->first->value->dump(); errs() << " Weight::" << PII->second << "\n";
+                  }
+                  count++;
+                  }
+
+
 				return inequalityGraph;
 			}
 

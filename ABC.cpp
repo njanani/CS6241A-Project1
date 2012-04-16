@@ -70,7 +70,7 @@ struct ABC : public ModulePass
 						{           
 							//increment checks inserted counter
 							checksInserted++;
-							
+	
 							//create split in basic block for function call insertion (branch)
 							Instruction* next = inst->getNextNode();
 							BasicBlock* oldBlock = inst->getParent();

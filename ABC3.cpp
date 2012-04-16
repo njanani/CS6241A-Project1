@@ -68,7 +68,7 @@ struct ABC3 : public ModulePass
 					{
 					  int index = si->getNumOperands()-2;
 					  if(ConstantInt *CI = dyn_cast<ConstantInt>(si->getOperand(index))){
-					      errs()<<*CI<<"\n";
+					      //errs()<<*CI<<"\n";
 					      //have to distinguish between the three different types of assignations
 					  }
 					}
@@ -106,7 +106,7 @@ struct ABC3 : public ModulePass
 						{           
 							//increment checks inserted counter
 							checksInserted++;
-							errs()<<"inserted "<<(checksInserted+1)<<" "<<*gep<<"\n";
+							//errs()<<"inserted "<<(checksInserted+1)<<" "<<*gep<<"\n";
 							
 							//create split in basic block for function call insertion (branch)
 							Instruction* next = inst->getNextNode();

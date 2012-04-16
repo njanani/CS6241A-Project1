@@ -1,6 +1,13 @@
 GIT respository for CS6241A - Project1
+---------------------------------------
+
 Current directory - llvm-3.0/lib/Transforms/CS6241A-Project1
-Path to C file - examples/test.c
 
 (1) Baseline
-opt -stats -load ../../../Debu
+opt -stats -time-passes -disable-opt -load ../../../Debug+Asserts/lib/abc.so -abc < file.linked.rbc > newfile.rbc
+
+(2) Optimized I
+opt -stats -time-passes -gvn -load ../../../Debug+Asserts/lib/abc.so -abc < file.linked.rbc > newfile.rbc
+
+(3) Static opt
+
