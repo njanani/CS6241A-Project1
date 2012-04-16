@@ -38,20 +38,20 @@ Array bound check for both upper and lower bounds are inserted whenever there is
 
 
 
-(3)
-a) Constructing e-SSA form: As stated in the paper, the first 3 types of constraints are taken care of in the normal SSA form. e-SSA incorporates the remai
-ning two constraints of the form - x < y and check A[x]. In our implementation, check A[x] is actually represented by a compare instruction. 
-    The idea behind inserting PI instructions is to create a new SSA variable, which in a way, stores information about which branches (and as a result of which, what inequalities exist) were taken along different control paths. In our implementation, at every compare instruction, we insert a new basic block before e
-ach of its successors. Inside these basic blocks we insert PI instructions for each value involved in the compare instruction. PI instruction is of the form -
-x = pifunction_<variableTypeID>(x);. This ensures a new SSA value is generated when 'mem2reg' pass is invoked.
-    
-    b) Constructing inequality graph:
-    The graph consists of primarily two types of vertices: array length nodes and variables. Variables in turn can be PHI or non-PHI.
-      (i) For every ArrayType AllocaInst, we create a new vertex in the graph which stores - the array length and a pointer to the actual instruction.
-      (ii) For every PHI node, we have edges of weight 0 between the output and each of the incoming values. If an incoming value is constant, the output vertex is connected to all the array length vertices with weight = constant.value - Array length.
-      (iii)For Binary Operator Instructions: If the instruction is of the type Binary Operator, then we check if the binary operation is an addition or subtraction operation. If thats the case then, we continue to check if one of the operands in the instruction is a constant. If both the conditions are satisfied, we modify the suitably reflect the operation. For an operation of the type x = y + c, we introduce an edge in the graph from y to c with a weight c. If the operation is subtraction, then a weight of -c is given to the edge.
+(3) Static opt
+a) Construct e-SSA form
+Creating constraints C1,C2,C3 is straight forward as it is to detect assignment statements and they are already part of ssa.To create C5,we follow the steps mentioned in (1) Baseline.To add constraint C4, we need to insert PI instructions.
 
-      (iv)For PI instructions: We have implemented PI instructions as function calls with custom names given by us. Hence, whenever we encounter call instructions with out custom name, we recognize those as the PI instructions. Each PI instruction is the result of some comparison operation. The comparison might be between 2 variables or a constant and a variable. Also, the comparison operator between the operands might be LT, Equal to, GT, LT Equal to or GT Equal to. Moreover, the current PI instruction being considered might be the result of a true or a false comparison which can be detected by the block that the PI instruction is located in. We consider all of these cases with the logic to handle each derived as follows:
+<TBD>
+ 
+  
+b) Build inequality graph
+    The graph consists of two types of vertices:nodes for array length and for variables. Variables can either be PHI or nonPHI.
+      (i) If it is an array allocation isntruction, we create a new vertex in the graph which stores - the array length and a pointer to the instruction.
+      (ii)If it is a PHI node, we have edges of weight 0 between the output and each of the incoming values. If an incoming value is constant, the output vertex is connected to all the array length vertices with weight = constant.value - Array length.
+      (iii)In case of binary operator instructions: If the instruction is of the type Binary Operator, then we check if the binary operation is an addition or subtraction operation. If thats the case then, we continue to check if one of the operands in the instruction is a constant. If both the conditions are satisfied, we modify the suitably reflect the operation. For an operation of the type x = y + c, we introduce an edge in the graph from y to c with a weight c. If the operation is subtraction, then a weight of -c is given to the edge.This handles constraint C3.
+
+      (iv)Handle PI instructions: We have implemented PI instructions as function calls with custom defined names - (piInt). Hence, whenever we encounter call instructions with custom name, we recognize those as the PI instructions. Each PI instruction is the result of some comparison operation. The comparison might be between 2 variables or a constant and a variable. Also, the comparison operator between the operands might be LT, Equal to, GT, LT Equal to or GT Equal to. Moreover, the current PI instruction being considered might be the result of a true or a false comparison which can be detected by the block that the PI instruction is located in. We consider all of these cases with the logic to handle each derived as follows:
 If the code is of the form:
 if v1 <= w1 then
 	v2 = pi(v1)
@@ -64,9 +64,85 @@ then in the graph for the true block edges are inserted from v1 to v2, w1 to w2 
 
 Moreover, if one of the operands in the comparison is a constant, we then we directly introduce an edge from the other operand to all the array length nodes in the graph assigning weight constant - array length to the edge.
 
+c) Eliminate redundant array checks using inequality graph
+
+	The algorithm traverses the inequality graph to determine and eliminate bounds checks which are redundant. It uses two additional data structures. The first stores data about previous bounds checks, which is updated on each recurisve call to the "prove" method. The values stored are one of the following, True, Reduced, or False. The second is used to detect cycles. Two types of cycles can be detected, “amplifying” and "harmless." The algorithm uses two operations called meet and join. The meet operation chooses the maximum value, True > Reduced > False. While the join operation chooses the minimum value. These operations update the values of the checks stored in the first data structure. In our implementation, the nodes in the graph store an “in” – vector , which contains all nodes which may reach the given node, and the value of the edge. If the value falls within a given range, then the edge can chosen as a shortest path. The shortest path is calculated from the array length node in the graph, to the index node (the check node). A distance of less than zero indicates that the check is redundant, because it has already been calculated along all paths to the check. At the conclusion of the algorithm, checks with values less than zero are determined to be redundant and can be safely removed.
 
 
-    c) Using the inequality graph to remove redundant array bounds checks:
+Performance analysis:
 
-	The ABCD algorithm traverses the inequality graph to determine which bounds checks are redundant. It makes use of two additional data structures. The first stores data about previous bounds checks, which is updated on each recurisve call to the "prove" method. The values stored are one of the following, True, Reduced, or False. The second is used to detect cycles. Two types of cycles can be detected, amplifying and "harmless." The algorithm uses two operations called meet and join. The meet operation chooses the maximum value, True > Reduced > False. While the join operation chooses the minimum value. These operations update the values of the checks stored in the first data structure. In our implementation, the nodes in the graph store an inList, which contains all nodes which may reach the given node, and the value of the edge. If the value falls within a given range, then the edge can chosen as a shortest path. The shortest path is calculated from the array length node in the graph, to the index node (the check node). A distance of less than zero indicates that the check is redundant, because it has already been calculated along all paths to the check. At the conclusion of the algorithm, checks with values less than zero are determined to be redundant and can be safely removed.
+
+Cjpeg
+Encode
+Mpeg2decode
+Rawcaudio
+Rawdaudio
+toast
+
+ABCD
+gvn
+ABCD
+gvn
+ABCD
+gvn
+ABCD
+gvn
+ABCD
+gvn
+ABCD
+gvn
+No.of checks inserted
+
+
+
+
+
+
+
+
+
+
+
+
+No.of checks eliminated
+
+
+
+
+
+
+
+
+
+
+
+
+Time taken for redundancy elimination
+
+
+
+
+
+
+
+
+
+
+
+
+Performance degradation(speed)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

@@ -288,7 +288,7 @@ namespace {
 				}
 			}
 
-
+/*
 			//Print out graph
 						int count = 0;
 						for (std::map<Value *, Graph::INEQNode* >::iterator PI = inequalityGraph->variableList.begin(),
@@ -312,7 +312,7 @@ namespace {
 						}
 						count++;
 						}
-
+*/
 			 
 			return inequalityGraph;
 			}
@@ -503,7 +503,7 @@ namespace {
 				}
 			}
 
-				  //Print out graph
+/*				  //Print out graph
                   int count = 0;
                   for (std::map<Value *, Graph::INEQNode* >::iterator PI = inequalityGraph->variableList.begin(),
                   PE = inequalityGraph->variableList.end(); PI != PE; ++PI){
@@ -526,7 +526,7 @@ namespace {
                   }
                   count++;
                   }
-
+*/
 
 				return inequalityGraph;
 			}

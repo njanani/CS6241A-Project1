@@ -14,7 +14,7 @@
 
 //NOTE:  Run this and then run Mem2Reg. The pi function just returns
 //the value passed to them.  Since a new assignment is made, mem2reg
-//sets up the SSA correctly and the output becomes essa.  Another nice 
+//sets up the SSA correctly and the output becomes essa.  Another nice
 //benefit is that Mem2Reg also automically adds the necessary PHI nodes.
 
 
@@ -24,7 +24,7 @@
 #ifdef DEBUG
 #define DEBUG_PRINT(text) errs() << text << "\n"
 
-#else	//do nothing
+#else   //do nothing
 #define DEBUG_PRINT(text)
 
 #endif
@@ -33,89 +33,135 @@ using namespace llvm;
 
 struct ESSA : public ModulePass
 {
-	static char ID; // Pass identification, replacement for typeid
-	ESSA() : ModulePass(ID) {}
-	
-	virtual bool runOnModule(Module &M)
-	{
-		LLVMContext &C = M.getContext();
+       static char ID; // Pass identification, replacement for typeid
+       ESSA() : ModulePass(ID) {}
 
-		//errs() << "Pass called sucessfully!\n";
-		std::vector<BranchInst*> vCondBranch;
+       virtual bool runOnModule(Module &M)
+       {
+               LLVMContext &C = M.getContext();
 
-		Function *pi = (Function*)M.getOrInsertFunction("piInt", Type::getInt32Ty(C), Type::getInt32Ty(C), NULL);
-		BasicBlock* piBlock = BasicBlock::Create(C, "piFuncBlock", pi);
-		IRBuilder<> builder(piBlock);
-		builder.CreateRet(pi->arg_begin());
+               //errs() << "Pass called sucessfully!\n";
+               std::vector<BranchInst*> vCondBranch;
 
-		//first go through and grab all of the conditional branches
-		for(Module::iterator MI = M.begin(), ME = M.end(); MI != ME; ++MI)
-		{
-			for(Function::iterator b = MI->begin(), end = MI->end(); b != end; ++b)
-			{
-				//leave func defs alone
-				if (!MI->isDeclaration()) 
-				{
-					if(BranchInst *bi = dyn_cast<BranchInst>(b->getTerminator()))
-					{
-						if(bi->isConditional())	
-						{
-							//errs() << "Have a conditional branch!\n";
-							vCondBranch.push_back(bi);	
-						}
-					}
-				}
-			}
-		}
-		for(std::vector<BranchInst*>::iterator i = vCondBranch.begin(), e = vCondBranch.end(); i != e; ++i)
-		{
-			DEBUG_PRINT("Examining a conditional branch!");
-			Value *ops[2];
-			CmpInst *cmp = dyn_cast<CmpInst>((*i)->getCondition());
+               //Function *pi = (Function*)M.getOrInsertFunction("piInt", Type::getInt32Ty(C), Type::getInt32Ty(C), NULL);
+               //BasicBlock* piBlock = BasicBlock::Create(C, "piFuncBlock", pi);
+               //IRBuilder<> builder(piBlock);
+               //builder.CreateRet(pi->arg_begin());
 
-			ops[0] = cmp->getOperand(0);
-			ops[1] = cmp->getOperand(1);
-				
-			for(unsigned int x = 0; x < (*i)->getNumSuccessors(); ++x)
-			{
-							
-				BasicBlock* curr = (*i)->getSuccessor(x);											
-				
-				for(int y = 0; y < 2; ++y)
-				{
-					//dont bother with constants.  
-					//Note after mem2reg may still have some with constants
-					if(!isa<Constant>(ops[y])) 
-					{	
-						BasicBlock::iterator iter = curr->begin();
-						BasicBlock* newBlock = SplitBlock(curr, iter, this);
-						
-						BasicBlock* piBlock = BasicBlock::Create(C, "piFuncCall", curr->getParent(), newBlock);
+               //first go through and grab all of the conditional branches
+               for(Module::iterator MI = M.begin(), ME = M.end(); MI != ME; ++MI)
+               {
+                       for(Function::iterator b = MI->begin(), end = MI->end(); b != end; ++b)
+                       {
+                               //leave func defs alone
+                               if (!MI->isDeclaration())
+                               {
+                                       if(BranchInst *bi = dyn_cast<BranchInst>(b->getTerminator()))
+                                       {
+                                               if(bi->isConditional())
+                                               {
+                                                       //errs() << "Have a conditional branch!\n";
+                                                       vCondBranch.push_back(bi);
+                                               }
+                                       }
+                               }
+                       }
+               }
+               for(std::vector<BranchInst*>::iterator i = vCondBranch.begin(), e = vCondBranch.end(); i != e; ++i)
+               {
+                       DEBUG_PRINT("Examining a conditional branch!");
+                       Value *ops[2];
+                       if(CmpInst *cmp = dyn_cast<CmpInst>((*i)->getCondition()))
+                       {
+               if (cmp->getNumOperands() < 2)
+                       continue;
+               if (!cmp->isIntPredicate())
+                   continue;
 
-						//remove old terminator
-						builder.SetInsertPoint(curr);
-						TerminatorInst* term = curr->getTerminator();
-						DEBUG_PRINT("Joy");
-						term->eraseFromParent();
-						//create new one
-						builder.CreateBr(piBlock);
-						
-					
-						builder.SetInsertPoint(piBlock);
-						CallInst* cPi = builder.CreateCall(pi, ops[y]); 
-						DEBUG_PRINT("Made it after create all!!!");
-						builder.CreateStore(cPi, ((LoadInst*)ops[y])->getOperand(0));
-						DEBUG_PRINT("Still no seg faults!!");
-						builder.CreateBr(newBlock);
-					}						
-				}
-			}
-		}
+                               ops[0] = cmp->getOperand(0);
+                               ops[1] = cmp->getOperand(1);
 
-		DEBUG_PRINT("Done!");
+                               //for(unsigned int x = 0; x < (*i)->getNumSuccessors(); ++x)
+                               //{
+                                       BasicBlock* trueBlock = (*i)->getSuccessor(0);
+                                       BasicBlock* falseBlock = (*i)->getSuccessor(1);
 
-		return true;
-	}
+                                       //BasicBlock* curr = (*i)->getSuccessor(x);
+                                       IRBuilder<> builder(trueBlock->getFirstNonPHI());
+                                       //builder.SetInsertPoint(curr->getFirstNonPHI());
+                                       if(!isa<Constant>(ops[0]))
+                                       {
+                                               if(isa<LoadInst>(ops[0]))
+                                               {
+                                                       pred_iterator PI = pred_begin(trueBlock);
+                                                       BasicBlock* Pred = *PI;
+
+                                                       if(++PI != pred_end(trueBlock))
+                                                               continue;
+
+                                                       PHINode* pi;
+
+                                                       pi = PHINode::Create(ops[0]->getType(), 1, "piFunc_t", trueBlock->begin());
+                                                       pi->addIncoming(ops[0], Pred);
+
+                                                       builder.SetInsertPoint(trueBlock->getFirstNonPHI());
+                                               builder.CreateStore(pi, ((LoadInst*)ops[0])->getOperand(0));
+
+                                                       PI = pred_begin(falseBlock);
+                                                       Pred = *PI;
+
+                                                       if(++PI != pred_end(falseBlock))
+                                                               continue;
+
+                                                       pi = PHINode::Create(ops[0]->getType(), 1, "piFunc_f", falseBlock->begin());
+                                                       pi->addIncoming(ops[0], Pred);
+
+                                                       builder.SetInsertPoint(falseBlock->getFirstNonPHI());
+                                               builder.CreateStore(pi, ((LoadInst*)ops[0])->getOperand(0));
+
+
+                                               }
+                                       }
+                                       if(!isa<Constant>(ops[1]))
+                                       {
+                                               if(isa<LoadInst>(ops[1]))
+                                               {
+                                                       pred_iterator PI = pred_begin(trueBlock);
+                                                       BasicBlock* Pred = *PI;
+
+                                                       if(++PI != pred_end(trueBlock))
+                                                               continue;
+
+                                                       PHINode* pi;
+
+
+                                                       pi = PHINode::Create(ops[1]->getType(), 1, "piFunc_t", trueBlock->begin());
+                                                       pi->addIncoming(ops[1], Pred);
+
+                                                       builder.SetInsertPoint(trueBlock->getFirstNonPHI());
+                                                       builder.CreateStore(pi, ((LoadInst*)ops[1])->getOperand(0));
+
+                                                       PI = pred_begin(falseBlock);
+                                                       Pred = *PI;
+
+                                                       if(++PI != pred_end(falseBlock))
+                                                               continue;
+
+                                                       pi = PHINode::Create(ops[1]->getType(), 1, "piFunc_f", falseBlock->begin());
+                                                       pi->addIncoming(ops[1], Pred);
+
+                                                       builder.SetInsertPoint(falseBlock->getFirstNonPHI());
+                                                       builder.CreateStore(pi, ((LoadInst*)ops[1])->getOperand(0));
+                                               }
+                                       }
+                               //}
+                       }
+               }
+
+               DEBUG_PRINT("Done!");
+
+               return true;
+       }
 };
 
 char ESSA::ID = 1;
