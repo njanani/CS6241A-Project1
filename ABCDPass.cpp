@@ -129,12 +129,13 @@ namespace {
 					if (isa<PHINode>(*I)){
 						PHINode *phi = (PHINode *)(&*I);
 						//Process pi functions
-						if((*I).getName().startsWith(StringRef(piFoo)))
+						if((*I).getName().startswith(StringRef(piFoo)))
 						{
 							//Insert code to handle piFunctions
-							instr_iterator temp_I = I;
+							inst_iterator temp_I = I;
 							Graph::INEQNode * ndSrc  = Graph::getOrInsertNode(inequalityGraph,cast<CallInst>(&*temp_I)->getArgOperand(0),0);
 							if(phi->getNumIncomingValues()==1){
+								
 							}
 							if(phi->getNumIncomingValues()==2){
 							}
