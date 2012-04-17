@@ -128,6 +128,19 @@ namespace {
 				for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I){
 					if (isa<PHINode>(*I)){
 						PHINode *phi = (PHINode *)(&*I);
+						//Process pi functions
+						char *piFoo = "piFunc";
+						if((*I).getName().startsWith(StringRef(piFoo)))
+						{
+							//Insert code to handle piFunctions
+							instr_iterator temp_I = I;
+							Graph::INEQNode * ndSrc  = Graph::getOrInsertNode(inequalityGraph,cast<CallInst>(&*temp_I)->getArgOperand(0),0);
+							if(phi->getNumIncomingValues()==1){
+							}
+							if(phi->getNumIncomingValues()==2){
+							}
+							continue;
+						}
 						Graph::INEQNode  *res = Graph::getOrInsertNode(inequalityGraph, (Value *)phi, 0);
 						res->isPhi = true;
 						std::map<Value*, Graph::INEQNode * > *arrayLengthPtr = &(inequalityGraph->arrayLengthList);
