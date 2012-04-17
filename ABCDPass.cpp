@@ -107,7 +107,7 @@ namespace {
 
 			Graph::INEQGraph  * construct_lbgraph(Function &F){
 				char *lowerChkBlock = "checkLower";
-				char *piFoo  = "piInt";
+				char *piFoo  = "piFunc";
 				Graph::INEQGraph  *inequalityGraph = new Graph::INEQGraph ();
 				for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I){
 					if(isa<AllocaInst>(*I)){
@@ -129,7 +129,6 @@ namespace {
 					if (isa<PHINode>(*I)){
 						PHINode *phi = (PHINode *)(&*I);
 						//Process pi functions
-						char *piFoo = "piFunc";
 						if((*I).getName().startsWith(StringRef(piFoo)))
 						{
 							//Insert code to handle piFunctions
