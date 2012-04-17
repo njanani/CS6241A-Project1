@@ -107,7 +107,7 @@ namespace {
 
 			Graph::INEQGraph  * construct_lbgraph(Function &F){
 				char *lowerChkBlock = "checkLower";
-				char *piFoo  = "piFunc";
+				char *piFoo  = "piInt";
 				Graph::INEQGraph  *inequalityGraph = new Graph::INEQGraph ();
 				for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I){
 					if(isa<AllocaInst>(*I)){
@@ -129,16 +129,114 @@ namespace {
 					if (isa<PHINode>(*I)){
 						PHINode *phi = (PHINode *)(&*I);
 						//Process pi functions
+						char *piFoo = "piFunc";
 						if((*I).getName().startswith(StringRef(piFoo)))
 						{
-							//Insert code to handle piFunctions
-							inst_iterator temp_I = I;
-							Graph::INEQNode * ndSrc  = Graph::getOrInsertNode(inequalityGraph,cast<CallInst>(&*temp_I)->getArgOperand(0),0);
-							if(phi->getNumIncomingValues()==1){
-								
-							}
-							if(phi->getNumIncomingValues()==2){
-							}
+							//Code to perform graph insertions which are common to both 
+							//C4 and C5
+					                inst_iterator temp_I = I;
+        		                                Graph::INEQNode * ndDest [2];
+                        		                int i = 0, cntPI = phi->getNumIncomingValues();
+                                              		while(i<cntPI){
+                                                		 Graph::INEQNode * ndSrc  = Graph::getOrInsertNode(inequalityGraph,cast<CallInst>(&*temp_I)->getArgOperand(0),0);
+
+                                                            	 ndDest [i] = Graph::getOrInsertNode(inequalityGraph,((Value*)&*temp_I),0);
+			
+                       		                                 Graph::insertEdge(ndSrc ,ndDest [cntPI],0);
+                                                     		 cntPI++;
+								 //get the next pi function if available else break
+                                               			 i++;
+								  
+ 			                                  }
+							//if pi functions where processed
+							if(cntPI>0){
+		                                                int trueBB  = -1;
+                		                                BranchInst* brI = cast<BranchInst>(I->getParent()->getSinglePredecessor()->getTerminator());
+                                		                if(brI->getSuccessor(0) == I->getParent())
+                                                		        trueBB  = 1;
+
+		                                                CmpInst* cmpI = cast<CmpInst>(brI->getCondition());
+                		                                int predicate = cmpI->getPredicate();
+                                		                int predicateClass;
+                                               			 //Identifies the type of branch compare instr
+		                                                if(predicate == CmpInst::ICMP_ULT || predicate == CmpInst::ICMP_SLT){
+                		                                        predicate = 1;
+                                		                        predicateClass = 1;
+	
+        		                                        }else if(predicate == CmpInst::ICMP_ULE || predicate == CmpInst::ICMP_SLE || predicate == CmpInst::ICMP_EQ){
+                        		                                predicate = 1;
+                                        		                predicateClass = 2;
+	
+        		                                        }else if(predicate == CmpInst::ICMP_UGT || predicate == CmpInst::ICMP_SGT){
+                        		                                predicate = -1;
+                                        		                predicateClass = -1;
+	
+        		                                        }else if(predicate == CmpInst::ICMP_UGE || predicate == CmpInst::ICMP_SGE){
+                        		                                predicate = -1;
+                                        		                predicateClass = -2;
+
+		                                                }else{
+                		                                        predicate = 0;
+                                	                }
+								Value *operand1, *operand2;
+		                                                int operandLoc;
+	
+        		                                        if(cntPI == 1){//Array bounds check
+                        		                                if(isa<ConstantInt>(*(cmpI->getOperand(0)))){
+                                        		                        operand1 = cmpI->getOperand(1);
+                                                        		        operand2 = cmpI->getOperand(0);
+		                                                                operandLoc = -1;
+                	                                        }else if(isa<ConstantInt>(*(cmpI->getOperand(1)))){
+                        	                                        operand1 = cmpI->getOperand(0);
+                                	                                operand2 = cmpI->getOperand(1);
+                                        	                        operandLoc = 1;
+                                                	        }else
+                                                        	        continue;
+	                                                        for(std::map<Value*, Graph::INEQNode * >::iterator it = (inequalityGraph->arrayLengthList).begin(); it !=(inequalityGraph->arrayLengthList).end(); ++it){
+                	                                                if(predicateClass == 1){
+        	        	                                                        Graph::insertEdge(it->second,ndDest [0],(cast<ConstantInt>(operand2)->getSExtValue() - 1 - it->second->length));
+                                	                                }
+                                        	                        else{
+                                                	                        Graph::insertEdge(it->second,ndDest [0],(cast<ConstantInt>(operand2)->getSExtValue() - it->second->length));
+                                                        	        }
+
+                                                      		  }
+
+                                               		 }
+							 else{//cntPI == 2 for  'if, while'
+                                                        I++;
+	                                                        if(trueBB  == 1 &&  predicate == 1){
+        	                                                        if(predicateClass == 1)
+                	                                                        Graph::insertEdge(ndDest [1], ndDest [0], -1);
+                        	                                        else
+                                	                                        Graph::insertEdge(ndDest [1], ndDest [0], 0);
+                                        	                }
+                                                	        else if(trueBB  == 1 &&  predicate == -1){
+                                                        	        if(predicateClass == -1)
+                                                                	        Graph::insertEdge(ndDest [0], ndDest [1], -1);
+	                                                                else
+        	                                                                Graph::insertEdge(ndDest [0], ndDest [1], 0);
+                	                                        }
+                        	                                else if(trueBB  == -1 &&  predicate == 1){
+                                	                                predicate = cmpI->getPredicate();
+                                        	                        if(predicate == CmpInst::FCMP_OLT || predicate == CmpInst::FCMP_ULT || predicate == CmpInst::ICMP_ULT || predicate == CmpInst::ICMP_SLT){
+                                                	                        Graph::insertEdge(ndDest [0], ndDest [1], 0);
+                                                        	        }else if(predicate == CmpInst::FCMP_OLE || predicate == CmpInst::FCMP_ULE || predicate == CmpInst::ICMP_ULE || predicate == CmpInst::ICMP_SLE){
+                                                                	        Graph::insertEdge(ndDest [0], ndDest [1], -1);
+                                                               	 }
+	                                                        }else if(trueBB  == -1 &&  predicate == -1){
+        	                                                        predicate = cmpI->getPredicate();
+                	                                                if(predicate == CmpInst::FCMP_OGT || predicate == CmpInst::FCMP_UGT || predicate == CmpInst::ICMP_UGT || predicate == CmpInst::ICMP_SGT){
+                        	                                                Graph::insertEdge(ndDest [1], ndDest [0], 0);
+                                	                                }else if(predicate == CmpInst::FCMP_OGE || predicate == CmpInst::FCMP_UGE || predicate == CmpInst::ICMP_UGE || predicate == CmpInst::ICMP_SGE){
+                                        	                                Graph::insertEdge(ndDest [1], ndDest [0], -1);
+                                                               	   }
+                                                       		 }
+                                                	}
+
+						}
+						
+							//C5
 							continue;
 						}
 						Graph::INEQNode  *res = Graph::getOrInsertNode(inequalityGraph, (Value *)phi, 0);
@@ -188,144 +286,10 @@ namespace {
 					Graph::INEQNode * ndSrc  = Graph::getOrInsertNode(inequalityGraph,(Value*)(&*I),0);
 					Graph::insertEdge(ndSrc ,ndDest ,0);
 
-				}else if(isa<CallInst>(*I)){
-					//I->dump();e
-					//Deal with pair of PI functions here
-					inst_iterator temp_I = I;
-					Graph::INEQNode * ndDest [2];
-					int i = 0, cntPI = 0;
-					do{
-						Function *func = cast<CallInst>(&*temp_I)->getCalledFunction();
-						if(func != NULL && func->hasName()){
-							if(func->getName().startswith(StringRef(piFoo ))){
-								Graph::INEQNode * ndSrc  = Graph::getOrInsertNode(inequalityGraph,cast<CallInst>(&*temp_I)->getArgOperand(0),0);
-
-								ndDest [cntPI] = Graph::getOrInsertNode(inequalityGraph,((Value*)&*temp_I),0);
-
-								Graph::insertEdge(ndSrc ,ndDest [cntPI],0);
-								i--;
-								cntPI++;
-							}
-						}
-						temp_I++;
-						i++;
-					}while(isa<CallInst>(*temp_I) && i == 0);
-
-					if(cntPI>0){
-						int trueBB  = -1;
-						BranchInst* brI = cast<BranchInst>(I->getParent()->getSinglePredecessor()->getTerminator());
-						if(brI->getSuccessor(0) == I->getParent())
-							trueBB  = 1;
-
-						CmpInst* cmpI = cast<CmpInst>(brI->getCondition());
-						int predicate = cmpI->getPredicate();
-						int predicateClass;
-						//Identifies the type of branch compare instr
-						if(predicate == CmpInst::FCMP_OLT || predicate == CmpInst::FCMP_ULT || predicate == CmpInst::ICMP_ULT || predicate == CmpInst::ICMP_SLT){
-							predicate = 1;
-							predicateClass = 1;
-
-						}else if(predicate == CmpInst::FCMP_OEQ ||predicate == CmpInst::FCMP_OLE || predicate == CmpInst::FCMP_ULE || predicate == CmpInst::FCMP_UEQ || predicate == CmpInst::ICMP_ULE || predicate == CmpInst::ICMP_SLE || predicate == CmpInst::ICMP_EQ){
-							predicate = 1;
-							predicateClass = 2;
-
-						}else if(predicate == CmpInst::FCMP_OGT || predicate == CmpInst::FCMP_UGT || predicate == CmpInst::ICMP_UGT || predicate == CmpInst::ICMP_SGT){
-							predicate = -1;
-							predicateClass = -1;
-
-						}else if(predicate == CmpInst::FCMP_OGE || predicate == CmpInst::FCMP_UGE || predicate == CmpInst::ICMP_UGE || predicate == CmpInst::ICMP_SGE){
-							predicate = -1;
-							predicateClass = -2;
-
-						}else{
-							predicate = 0;
-						}
-
-
-						Value *operand1, *operand2;
-						int operandLoc;
-
-						if(cntPI == 1){//Array bounds check
-							if(isa<ConstantInt>(*(cmpI->getOperand(0)))){
-								operand1 = cmpI->getOperand(1);
-								operand2 = cmpI->getOperand(0);
-								operandLoc = -1;
-							}else if(isa<ConstantInt>(*(cmpI->getOperand(1)))){
-								operand1 = cmpI->getOperand(0);
-								operand2 = cmpI->getOperand(1);
-								operandLoc = 1;
-							}else
-								continue;
-							for(std::map<Value*, Graph::INEQNode * >::iterator it = (inequalityGraph->arrayLengthList).begin(); it !=(inequalityGraph->arrayLengthList).end(); ++it){
-								if(predicateClass == 1){
-									Graph::insertEdge(it->second,ndDest [0],(cast<ConstantInt>(operand2)->getSExtValue() - 1 - it->second->length));
-								}
-								else{
-									Graph::insertEdge(it->second,ndDest [0],(cast<ConstantInt>(operand2)->getSExtValue() - it->second->length));
-								}
-
-							}
-
-						}else{//cntPI == 2 for  'if, while'
-							I++;
-							if(trueBB  == 1 &&  predicate == 1){
-								if(predicateClass == 1)
-									Graph::insertEdge(ndDest [1], ndDest [0], -1);
-								else
-									Graph::insertEdge(ndDest [1], ndDest [0], 0);
-							}
-							else if(trueBB  == 1 &&  predicate == -1){
-								if(predicateClass == -1)
-									Graph::insertEdge(ndDest [0], ndDest [1], -1);
-								else
-									Graph::insertEdge(ndDest [0], ndDest [1], 0);
-							}    
-							else if(trueBB  == -1 &&  predicate == 1){
-								predicate = cmpI->getPredicate();
-								if(predicate == CmpInst::FCMP_OLT || predicate == CmpInst::FCMP_ULT || predicate == CmpInst::ICMP_ULT || predicate == CmpInst::ICMP_SLT){
-									Graph::insertEdge(ndDest [0], ndDest [1], 0);
-								}else if(predicate == CmpInst::FCMP_OLE || predicate == CmpInst::FCMP_ULE || predicate == CmpInst::ICMP_ULE || predicate == CmpInst::ICMP_SLE){
-									Graph::insertEdge(ndDest [0], ndDest [1], -1);
-								}    
-							}else if(trueBB  == -1 &&  predicate == -1){
-								predicate = cmpI->getPredicate();
-								if(predicate == CmpInst::FCMP_OGT || predicate == CmpInst::FCMP_UGT || predicate == CmpInst::ICMP_UGT || predicate == CmpInst::ICMP_SGT){
-									Graph::insertEdge(ndDest [1], ndDest [0], 0);
-								}else if(predicate == CmpInst::FCMP_OGE || predicate == CmpInst::FCMP_UGE || predicate == CmpInst::ICMP_UGE || predicate == CmpInst::ICMP_SGE){
-									Graph::insertEdge(ndDest [1], ndDest [0], -1);
-								}
-							}
-						}
-
-					}
+				
 				}
 			}
 
-/*
-			//Print out graph
-						int count = 0;
-						for (std::map<Value *, Graph::INEQNode* >::iterator PI = inequalityGraph->variableList.begin(),
-						PE = inequalityGraph->variableList.end(); PI != PE; ++PI){
-
-						errs() << "\nNode" << count; PI->first->dump(); //errs() << "\n";
-						for (std::map<Graph::INEQNode*, int >::iterator PII = PI->second->out.begin(),
-						PEE = PI->second->out.end(); PII != PEE; ++PII){
-						errs() << "Node" << count << "outlist::To"; PII->first->value->dump(); errs() << " Weight::" << PII->second << "\n";
-						}
-						count++;
-						}
-
-						for (std::map<Value *, Graph::INEQNode* >::iterator PI = inequalityGraph->arrayLengthList.begin(),
-						PE = inequalityGraph->arrayLengthList.end(); PI != PE; ++PI){
-
-						errs() << "\nNode" << count; PI->first->dump(); //errs() << "\n";
-						for (std::map<Graph::INEQNode*, int >::iterator PII = PI->second->out.begin(),
-						PEE = PI->second->out.end(); PII != PEE; ++PII){
-						errs() << "Node" << count << "outlist::To";  PII->first->value->dump(); errs() << " Weight::" << PII->second << "\n";
-						}
-						count++;
-						}
-*/
 			 
 			return inequalityGraph;
 			}
@@ -354,9 +318,120 @@ namespace {
 				for (inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I){
 					if (isa<PHINode>(*I)){
 						PHINode *phi = (PHINode *)(&*I);
+						//Process pi functions
+						char *piFoo = "piFunc";
+						if((*I).getName().startswith(StringRef(piFoo)))
+						{
+							//Code to perform graph insertions which are common to both 
+							//C4 and C5
+					                inst_iterator temp_I = I;
+        		                                Graph::INEQNode * ndDest [2];
+                        		                int i = 0, cntPI = phi->getNumIncomingValues();
+                                              		while(i<cntPI){
+                                                		 Graph::INEQNode * ndSrc  = Graph::getOrInsertNode(inequalityGraph,cast<CallInst>(&*temp_I)->getArgOperand(0),0);
+
+                                                            	 ndDest [i] = Graph::getOrInsertNode(inequalityGraph,((Value*)&*temp_I),0);
+			
+                       		                                 Graph::insertEdge(ndSrc ,ndDest [i],0);
+                                                     		 cntPI++;
+								 //get the next pi function if available else break
+                                               			 i++;
+								  
+ 			                                  }
+							//if pi functions where processed
+							if(cntPI>0){
+		                                                int trueBB  = -1;
+                		                                BranchInst* brI = cast<BranchInst>(I->getParent()->getSinglePredecessor()->getTerminator());
+                                		                if(brI->getSuccessor(0) == I->getParent())
+                                                		        trueBB  = 1;
+
+		                                                CmpInst* cmpI = cast<CmpInst>(brI->getCondition());
+                		                                int predicate = cmpI->getPredicate();
+                                		                int predicateClass;
+                                               			 //Identifies the type of branch compare instr
+		                                                if(predicate == CmpInst::ICMP_ULT || predicate == CmpInst::ICMP_SLT){
+                		                                        predicate = 1;
+                                		                        predicateClass = 1;
+	
+        		                                        }else if(predicate == CmpInst::ICMP_ULE || predicate == CmpInst::ICMP_SLE || predicate == CmpInst::ICMP_EQ){
+                        		                                predicate = 1;
+                                        		                predicateClass = 2;
+	
+        		                                        }else if(predicate == CmpInst::ICMP_UGT || predicate == CmpInst::ICMP_SGT){
+                        		                                predicate = -1;
+                                        		                predicateClass = -1;
+	
+        		                                        }else if(predicate == CmpInst::ICMP_UGE || predicate == CmpInst::ICMP_SGE){
+                        		                                predicate = -1;
+                                        		                predicateClass = -2;
+
+		                                                }else{
+                		                                        predicate = 0;
+                                	                }
+								Value *operand1, *operand2;
+		                                                int operandLoc;
+	
+        		                                        if(cntPI == 1){//Array bounds check
+                        		                                if(isa<ConstantInt>(*(cmpI->getOperand(0)))){
+                                        		                        operand1 = cmpI->getOperand(1);
+                                                        		        operand2 = cmpI->getOperand(0);
+		                                                                operandLoc = -1;
+                	                                        }else if(isa<ConstantInt>(*(cmpI->getOperand(1)))){
+                        	                                        operand1 = cmpI->getOperand(0);
+                                	                                operand2 = cmpI->getOperand(1);
+                                        	                        operandLoc = 1;
+                                                	        }else
+                                                        	        continue;
+	                                                        for(std::map<Value*, Graph::INEQNode * >::iterator it = (inequalityGraph->arrayLengthList).begin(); it !=(inequalityGraph->arrayLengthList).end(); ++it){
+                	                                                if(predicateClass == 1){
+        	        	                                                        Graph::insertEdge(it->second,ndDest [0],(cast<ConstantInt>(operand2)->getSExtValue() - 1 - it->second->length));
+                                	                                }
+                                        	                        else{
+                                                	                        Graph::insertEdge(it->second,ndDest [0],(cast<ConstantInt>(operand2)->getSExtValue() - it->second->length));
+                                                        	        }
+
+                                                      		  }
+
+                                               		 }
+							 else{//cntPI == 2 for  'if, while'
+                                                        I++;
+	                                                        if(trueBB  == 1 &&  predicate == 1){
+        	                                                        if(predicateClass == 1)
+                	                                                        Graph::insertEdge(ndDest [1], ndDest [0], -1);
+                        	                                        else
+                                	                                        Graph::insertEdge(ndDest [1], ndDest [0], 0);
+                                        	                }
+                                                	        else if(trueBB  == 1 &&  predicate == -1){
+                                                        	        if(predicateClass == -1)
+                                                                	        Graph::insertEdge(ndDest [0], ndDest [1], -1);
+	                                                                else
+        	                                                                Graph::insertEdge(ndDest [0], ndDest [1], 0);
+                	                                        }
+                        	                                else if(trueBB  == -1 &&  predicate == 1){
+                                	                                predicate = cmpI->getPredicate();
+                                        	                        if(predicate == CmpInst::FCMP_OLT || predicate == CmpInst::FCMP_ULT || predicate == CmpInst::ICMP_ULT || predicate == CmpInst::ICMP_SLT){
+                                                	                        Graph::insertEdge(ndDest [0], ndDest [1], 0);
+                                                        	        }else if(predicate == CmpInst::FCMP_OLE || predicate == CmpInst::FCMP_ULE || predicate == CmpInst::ICMP_ULE || predicate == CmpInst::ICMP_SLE){
+                                                                	        Graph::insertEdge(ndDest [0], ndDest [1], -1);
+                                                               	 }
+	                                                        }else if(trueBB  == -1 &&  predicate == -1){
+        	                                                        predicate = cmpI->getPredicate();
+                	                                                if(predicate == CmpInst::FCMP_OGT || predicate == CmpInst::FCMP_UGT || predicate == CmpInst::ICMP_UGT || predicate == CmpInst::ICMP_SGT){
+                        	                                                Graph::insertEdge(ndDest [1], ndDest [0], 0);
+                                	                                }else if(predicate == CmpInst::FCMP_OGE || predicate == CmpInst::FCMP_UGE || predicate == CmpInst::ICMP_UGE || predicate == CmpInst::ICMP_SGE){
+                                        	                                Graph::insertEdge(ndDest [1], ndDest [0], -1);
+                                                               	   }
+                                                       		 }
+                                                	}
+
+						}
+						
+							//C5
+							continue;
+						}
 						Graph::INEQNode  *res = Graph::getOrInsertNode(inequalityGraph, (Value *)phi, 0);
 						res->isPhi = true;
-						map<Value*, Graph::INEQNode * > *arrayLengthPtr = &(inequalityGraph->arrayLengthList);
+						std::map<Value*, Graph::INEQNode * > *arrayLengthPtr = &(inequalityGraph->arrayLengthList);
 						for (int i = 0, total = phi->getNumIncomingValues(); i < total; i++){
 							Value *inVal = phi->getIncomingValue(i);
 							if (isa<Constant>(*inVal)){
@@ -402,117 +477,6 @@ namespace {
 					Graph::insertEdge(ndSrc ,ndDest ,0);
 
 				}else if(isa<CallInst>(*I)){
-					//I->dump();e
-					//Deal with pair of PI functions here
-					inst_iterator temp_I = I;
-					Graph::INEQNode * ndDest [2];
-					int i = 0, cntPI = 0;
-					do{
-						Function *func = cast<CallInst>(&*temp_I)->getCalledFunction();
-						if(func != NULL && func->hasName()){
-							if(func->getName().startswith(StringRef(piFoo ))){
-								Graph::INEQNode * ndSrc  = Graph::getOrInsertNode(inequalityGraph,cast<CallInst>(&*temp_I)->getArgOperand(0),0);
-
-								ndDest [cntPI] = Graph::getOrInsertNode(inequalityGraph,((Value*)&*temp_I),0);
-
-								Graph::insertEdge(ndSrc ,ndDest [cntPI],0);
-								i--;
-								cntPI++;
-							}
-						}
-						temp_I++;
-						i++;
-					}while(isa<CallInst>(*temp_I) && i == 0);
-
-					if(cntPI>0){
-						int trueBB  = -1;
-						BranchInst* brI = cast<BranchInst>(I->getParent()->getSinglePredecessor()->getTerminator());
-						if(brI->getSuccessor(0) == I->getParent())
-							trueBB  = 1;
-
-						CmpInst* cmpI = cast<CmpInst>(brI->getCondition());
-						int predicate = cmpI->getPredicate();
-						int predicateClass;
-						//Identifies the type of branch compare instr
-						if(predicate == CmpInst::FCMP_OLT || predicate == CmpInst::FCMP_ULT || predicate == CmpInst::ICMP_ULT || predicate == CmpInst::ICMP_SLT){
-							predicate = 1;
-							predicateClass = 1;
-
-						}else if(predicate == CmpInst::FCMP_OEQ ||predicate == CmpInst::FCMP_OLE || predicate == CmpInst::FCMP_ULE || predicate == CmpInst::FCMP_UEQ || predicate == CmpInst::ICMP_ULE || predicate == CmpInst::ICMP_SLE || predicate == CmpInst::ICMP_EQ){
-							predicate = 1;
-							predicateClass = 2;
-
-						}else if(predicate == CmpInst::FCMP_OGT || predicate == CmpInst::FCMP_UGT || predicate == CmpInst::ICMP_UGT || predicate == CmpInst::ICMP_SGT){
-							predicate = -1;
-							predicateClass = -1;
-
-						}else if(predicate == CmpInst::FCMP_OGE || predicate == CmpInst::FCMP_UGE || predicate == CmpInst::ICMP_UGE || predicate == CmpInst::ICMP_SGE){
-							predicate = -1;
-							predicateClass = -2;
-
-						}else{
-							predicate = 0;
-						}
-
-
-						Value *operand1, *operand2;
-						int operandLoc;
-
-						if(cntPI == 1){//Array bounds check
-							if(isa<ConstantInt>(*(cmpI->getOperand(0)))){
-								operand1 = cmpI->getOperand(1);
-								operand2 = cmpI->getOperand(0);
-								operandLoc = -1;
-							}else if(isa<ConstantInt>(*(cmpI->getOperand(1)))){
-								operand1 = cmpI->getOperand(0);
-								operand2 = cmpI->getOperand(1);
-								operandLoc = 1;
-							}else
-								continue;
-							if(trueBB  * predicate * operandLoc > 0)//Ignore cases where variable is greater than constant since we
-								//are only considering upper bound checksin this case
-								for(std::map<Value*, Graph::INEQNode * >::iterator it = (inequalityGraph->arrayLengthList).begin(); it !=(inequalityGraph->arrayLengthList).end(); ++it){
-									if(predicateClass == 1){
-										Graph::insertEdge(it->second,ndDest [0],(cast<ConstantInt>(operand2)->getSExtValue() - 1 - it->second->length));
-									}
-									else{
-										Graph::insertEdge(it->second,ndDest [0],(cast<ConstantInt>(operand2)->getSExtValue() - it->second->length));
-									}
-
-								}
-
-						}else{//cntPI == 2 for  'if, while'
-							I++;
-							if(trueBB  == 1 &&  predicate == 1){
-								if(predicateClass == 1)
-									Graph::insertEdge(ndDest [1], ndDest [0], -1);
-								else
-									Graph::insertEdge(ndDest [1], ndDest [0], 0);
-							}
-							else if(trueBB  == 1 &&  predicate == -1){
-								if(predicateClass == -1)
-									Graph::insertEdge(ndDest [0], ndDest [1], -1);
-								else
-									Graph::insertEdge(ndDest [0], ndDest [1], 0);
-							}    
-							else if(trueBB  == -1 &&  predicate == 1){
-								predicate = cmpI->getPredicate();
-								if(predicate == CmpInst::FCMP_OLT || predicate == CmpInst::FCMP_ULT || predicate == CmpInst::ICMP_ULT || predicate == CmpInst::ICMP_SLT){
-									Graph::insertEdge(ndDest [0], ndDest [1], 0);
-								}else if(predicate == CmpInst::FCMP_OLE || predicate == CmpInst::FCMP_ULE || predicate == CmpInst::ICMP_ULE || predicate == CmpInst::ICMP_SLE){
-									Graph::insertEdge(ndDest [0], ndDest [1], -1);
-								}    
-							}else if(trueBB  == -1 &&  predicate == -1){
-								predicate = cmpI->getPredicate();
-								if(predicate == CmpInst::FCMP_OGT || predicate == CmpInst::FCMP_UGT || predicate == CmpInst::ICMP_UGT || predicate == CmpInst::ICMP_SGT){
-									Graph::insertEdge(ndDest [1], ndDest [0], 0);
-								}else if(predicate == CmpInst::FCMP_OGE || predicate == CmpInst::FCMP_UGE || predicate == CmpInst::ICMP_UGE || predicate == CmpInst::ICMP_SGE){
-									Graph::insertEdge(ndDest [1], ndDest [0], -1);
-								}
-							}
-						}
-
-					}
 				}
 			}
 
